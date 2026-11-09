@@ -25,9 +25,11 @@ class RegisterFile : public QObject
   private:
     static constexpr size_t NUM_GPR = 32; ///< Number of General-Purpose Registers (GPR).
     static constexpr size_t NUM_FPR = 32; ///< Number of Floating-Point Registers (FPR).
+    static constexpr size_t NUM_PREG = 32; ///< Number of Posit registers (PR).
 
     std::array<uint64_t, NUM_GPR> gpr_ = {}; ///< Array for storing GPR values.
     std::array<uint64_t, NUM_FPR> fpr_ = {}; ///< Array for storing FPR values.
+    std::array<uint16_t, NUM_PREG> preg_ = {}; ///< Posit16 register bank.
 
     static constexpr size_t NUM_CSR = 4096; ///< Number of Control and Status Registers (CSR).
 
@@ -79,6 +81,10 @@ class RegisterFile : public QObject
      */
     void WriteFpr(size_t reg, uint64_t value);
 
+    [[nodiscard]] uint16_t ReadPreg(size_t reg) const;
+    void WritePreg(size_t reg, uint16_t value);
+    [[nodiscard]] std::vector<uint16_t> GetPregValues() const;
+
     [[nodiscard]] uint64_t ReadCsr(size_t reg) const;
 
     void WriteCsr(size_t reg, uint64_t value);
@@ -100,6 +106,7 @@ class RegisterFile : public QObject
   signals:
     void updateRegister(size_t regIndex, uint64_t value);
     void updateFRegister(size_t regIndex, uint64_t value);
+    void updatePRegister(size_t regIndex, uint16_t value);
     void registerResetSignal();
 };
 

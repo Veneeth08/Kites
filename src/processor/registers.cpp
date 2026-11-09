@@ -23,6 +23,7 @@ void RegisterFile::Reset()
 {
     gpr_.fill(0);
     fpr_.fill(0.0);
+    preg_.fill(0);
     csr_.fill(0);
     csr_[0x002] = 0b000; // Default: RNE (IEEE 754)
     emit registerResetSignal();
@@ -61,6 +62,24 @@ void RegisterFile::WriteFpr(size_t reg, uint64_t value)
         throw std::out_of_range("Invalid FPR index");
     fpr_[reg] = value;
     emit updateFRegister(reg, value);
+}
+
+uint16_t RegisterFile::ReadPreg(size_t reg) const
+{
+    if (reg >= NUM_PREG) throw std::out_of_range("Invalid posit register index");
+    return preg_[reg];
+}
+
+void RegisterFile::WritePreg(size_t reg, uint16_t value)
+{
+    if (reg >= NUM_PREG) throw std::out_of_range("Invalid posit register index");
+    preg_[reg] = value;
+    emit updatePRegister(reg, value);
+}
+
+std::vector<uint16_t> RegisterFile::GetPregValues() const
+{
+    return {preg_.begin(), preg_.end()};
 }
 
 uint64_t RegisterFile::ReadCsr(size_t reg) const
