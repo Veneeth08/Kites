@@ -358,6 +358,39 @@ uint32_t generateFDSTypeMachineCode(const ICUnit &block)
     return machineCode;
 }
 
+uint32_t generatePositMachineCode(const ICUnit &block)
+{
+    const std::string op = block.getOpcode();
+    uint32_t funct3 = 0, funct7 = 0;
+    if (op == "padd") funct3 = 0;
+    else if (op == "psub") funct3 = 1;
+    else if (op == "pmul") funct3 = 2;
+    else if (op == "pdiv") funct3 = 3;
+    else if (op == "pcvt.s.p") { funct3 = 0; funct7 = 1; }
+    else if (op == "pcvt.p.s") { funct3 = 1; funct7 = 1; }
+    else if (op == "pcvt.w.p") { funct3 = 2; funct7 = 1; }
+    else if (op == "pcvt.p.w") { funct3 = 3; funct7 = 1; }
+    else if (op == "plh")
+    {
+        const uint32_t imm = static_cast<uint32_t>(std::stoll(block.getImm())) & 0xfff;
+        return (imm << 20) | (extractRegisterIndex(block.getRs1()) << 15) | (4u << 12) |
+               (extractRegisterIndex(block.getRd()) << 7) | 0x0bu;
+    }
+    else if (op == "psh")
+    {
+        const uint32_t imm = static_cast<uint32_t>(std::stoll(block.getImm())) & 0xfff;
+        return ((imm >> 5) << 25) | (extractRegisterIndex(block.getRs2()) << 20) |
+               (extractRegisterIndex(block.getRs1()) << 15) | (5u << 12) |
+               ((imm & 0x1f) << 7) | 0x0bu;
+    }
+    else throw std::runtime_error("Unknown Posit instruction: " + op);
+
+    const uint32_t rd = extractRegisterIndex(block.getRd());
+    const uint32_t rs1 = extractRegisterIndex(block.getRs1());
+    const uint32_t rs2 = block.getRs2().empty() ? 0u : extractRegisterIndex(block.getRs2());
+    return (funct7 << 25) | (rs2 << 20) | (rs1 << 15) | (funct3 << 12) | (rd << 7) | 0x0bu;
+}
+
 std::vector<uint32_t>
 generateMachineCode(const std::vector<std::pair<ICUnit, bool>> &IntermediateCode)
 {
@@ -366,7 +399,11 @@ generateMachineCode(const std::vector<std::pair<ICUnit, bool>> &IntermediateCode
     {
         const ICUnit &block = pair.first;
         uint32_t code;
-        if (instruction_set::isValidRTypeInstruction(block.getOpcode()))
+        if (instruction_set::isPositInstruction(block.getOpcode()))
+        {
+            code = generatePositMachineCode(block);
+        }
+        else if (instruction_set::isValidRTypeInstruction(block.getOpcode()))
         {
             code = generateRTypeMachineCode(block);
         }

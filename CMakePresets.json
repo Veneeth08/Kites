@@ -6,13 +6,8 @@
             "hidden": true,
             "generator": "Ninja",
             "binaryDir": "${sourceDir}/build/${presetName}",
-            "environment": {
-                "PATH": "D:/Qt/Tools/mingw1310_64/bin;D:/Qt/6.9.2/mingw_64/bin;$penv{PATH}"
-            },
             "cacheVariables": {
-                "CMAKE_PREFIX_PATH": "D:/Qt/6.9.2/mingw_64/lib/cmake",
-                "CMAKE_C_COMPILER": "D:/Qt/Tools/mingw1310_64/bin/gcc.exe",
-                "CMAKE_CXX_COMPILER": "D:/Qt/Tools/mingw1310_64/bin/g++.exe"
+                "CMAKE_PREFIX_PATH": "$env{QT_ROOT_DIR}"
             }
         },
         {
@@ -97,9 +92,6 @@
             "name": "test-coverage",
             "displayName": "Build tests (with coverage)",
             "configurePreset": "coverage",
-            "environment": {
-                "PATH": "D:/Qt/Tools/mingw1310_64/bin;D:/Qt/6.9.2/mingw_64/bin;$penv{PATH}"
-            },
             "targets": ["kites_test_cov"]
         }
     ],
@@ -110,9 +102,6 @@
             "configurePreset": "test",
             "output": {
                 "outputOnFailure": true
-            },
-            "environment": {
-                "PATH": "D:/Qt/Tools/mingw1310_64/bin;D:/Qt/6.9.2/mingw_64/bin;$penv{PATH}"
             },
             "filter": {
                 "exclude": {
@@ -127,9 +116,6 @@
             "output": {
                 "outputOnFailure": true
             },
-            "environment": {
-                "PATH": "D:/Qt/Tools/mingw1310_64/bin;D:/Qt/6.9.2/mingw_64/bin;$penv{PATH}"
-            },
             "filter": {
                 "exclude": {
                     "name": "^cov_"
@@ -142,9 +128,6 @@
             "configurePreset": "coverage",
             "output": {
                 "outputOnFailure": true
-            },
-            "environment": {
-                "PATH": "D:/Qt/Tools/mingw1310_64/bin;D:/Qt/6.9.2/mingw_64/bin;$penv{PATH}"
             },
             "filter": {
                 "include": {

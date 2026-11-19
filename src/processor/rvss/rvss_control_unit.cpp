@@ -20,6 +20,8 @@ void RVSSControlUnit::SetControlSignals(uint32_t instruction)
 
     switch (opcode)
     {
+    case 0x0b: // custom-0 Posit instructions are dispatched and validated in RVSSProcessor.
+        break;
     case 0b0110011:
     { // R-type (kAdd, kSub, kAnd, kOr, kXor, kSll, kSrl, etc.)
         reg_write_ = true;

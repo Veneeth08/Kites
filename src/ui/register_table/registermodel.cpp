@@ -1,9 +1,11 @@
 #include "registermodel.h"
 #include "common/register_names.h"
+#include "processor/posit.h"
 #include <QApplication>
 #include <QBrush>
 #include <QDebug>
 #include <QPalette>
+#include <cstring>
 
 namespace Kites
 {
@@ -15,6 +17,8 @@ RegisterModel::RegisterModel(QObject *parent, RegisterFile *regfile) : QAbstract
             &RegisterModel::updateRegisterValue);
     connect(m_currentRegisterFile, &RegisterFile::updateFRegister, this,
             &RegisterModel::updateFRegisterValue);
+    connect(m_currentRegisterFile, &RegisterFile::updatePRegister, this,
+            &RegisterModel::updatePRegisterValue);
     connect(m_currentRegisterFile, &RegisterFile::registerResetSignal, this,
             &RegisterModel::registerResetSlot);
 }
@@ -22,7 +26,7 @@ RegisterModel::RegisterModel(QObject *parent, RegisterFile *regfile) : QAbstract
 int RegisterModel::rowCount(const QModelIndex &parent) const
 {
     Q_UNUSED(parent);
-    return 64;
+    return 96;
 }
 
 int RegisterModel::columnCount(const QModelIndex &parent) const
@@ -30,6 +34,53 @@ int RegisterModel::columnCount(const QModelIndex &parent) const
     Q_UNUSED(parent);
     return 3;
 } // Register name, alias, value
+
+Qt::ItemFlags RegisterModel::flags(const QModelIndex &index) const
+{
+    Qt::ItemFlags result = QAbstractTableModel::flags(index);
+    if (index.isValid() && index.column() == 2 && index.row() >= 64 && index.row() < 96)
+        result |= Qt::ItemIsEditable;
+    return result;
+}
+
+bool RegisterModel::setData(const QModelIndex &index, const QVariant &value, int role)
+{
+    if (role != Qt::EditRole || !index.isValid() || index.column() != 2 ||
+        index.row() < 64 || index.row() >= 96 || !m_currentRegisterFile)
+        return false;
+
+    bool ok = false;
+    uint16_t raw = 0;
+    const QString text = value.toString().trimmed();
+    if (m_displayBase == Base::Decimal)
+    {
+        const float number = text.toFloat(&ok);
+        if (ok)
+        {
+            uint32_t bits = 0;
+            std::memcpy(&bits, &number, sizeof(bits));
+            raw = posit::fromFloat32Bits(bits);
+        }
+    }
+    else
+    {
+        QString digits = text;
+        int base = m_displayBase == Base::Binary ? 2 : 16;
+        if (digits.startsWith("0b", Qt::CaseInsensitive) ||
+            digits.startsWith("0x", Qt::CaseInsensitive))
+            digits = digits.mid(2);
+        const qulonglong parsed = digits.toULongLong(&ok, base);
+        if (ok && parsed <= 0xffffu)
+            raw = static_cast<uint16_t>(parsed);
+        else
+            ok = false;
+    }
+    if (!ok)
+        return false;
+
+    m_currentRegisterFile->WritePreg(static_cast<size_t>(index.row() - 64), raw);
+    return true;
+}
 
 void RegisterModel::setDisplayBase(Base base)
 {
@@ -85,9 +136,13 @@ QVariant RegisterModel::data(const QModelIndex &index, int role) const
             {
                 return QString("x%1").arg(row);
             }
-            else
+            else if (row < 64)
             {
                 return QString("f%1").arg(row - 32);
+            }
+            else
+            {
+                return QString("p%1").arg(row - 64);
             }
         case 1: // Register Alias
         {
@@ -95,6 +150,8 @@ QVariant RegisterModel::data(const QModelIndex &index, int role) const
                 return QString(register_names::kGprAliases[row]);
             else if (row < 64)
                 return QString(register_names::kFprAliases[row - 32]);
+            else if (row < 96)
+                return QString("p%1").arg(row - 64);
             else
                 return QString("");
         }
@@ -155,8 +212,24 @@ QVariant RegisterModel::data(const QModelIndex &index, int role) const
             }
             else
             {
-                return QString("");
-            } // TODO : add floating point register support
+                const uint16_t raw = m_currentRegisterFile->ReadPreg(row - 64);
+                switch (m_displayBase)
+                {
+                case Base::Binary:
+                    return QString("0b%1").arg(QString::number(raw, 2));
+                case Base::Decimal:
+                {
+                    const uint32_t floatBits = posit::toFloat32Bits(raw);
+                    float value;
+                    std::memcpy(&value, &floatBits, sizeof(value));
+                    return QString::number(static_cast<double>(value), 'g', 8);
+                }
+                case Base::Hexadecimal:
+                    return QString("0x%1").arg(QString::number(raw, 16).toUpper());
+                }
+                return QVariant{};
+            }
+            return QVariant{};
         }
         default:
             return QVariant{};
@@ -173,6 +246,8 @@ void RegisterModel::changeRegisterFile(RegisterFile *regfile)
             &RegisterModel::updateRegisterValue);
     connect(m_currentRegisterFile, &RegisterFile::updateFRegister, this,
             &RegisterModel::updateFRegisterValue);
+    connect(m_currentRegisterFile, &RegisterFile::updatePRegister, this,
+            &RegisterModel::updatePRegisterValue);
     // maybe we can directly connect it to
     connect(m_currentRegisterFile, &RegisterFile::registerResetSignal, this,
             &RegisterModel::registerResetSlot);
@@ -199,6 +274,14 @@ void RegisterModel::updateFRegisterValue(size_t regIndex, uint64_t value)
     //QModelIndex index = this->index(static_cast<int>(regIndex + 32), 2);
     m_highlightedRegisterIndex = regIndex + 32; // Update highlighted register index
     // emit dataChanged(index,index);
+    beginResetModel();
+    endResetModel();
+}
+
+void RegisterModel::updatePRegisterValue(size_t regIndex, uint16_t value)
+{
+    Q_UNUSED(value);
+    m_highlightedRegisterIndex = regIndex + 64;
     beginResetModel();
     endResetModel();
 }

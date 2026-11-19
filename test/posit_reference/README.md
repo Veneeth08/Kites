@@ -8,7 +8,8 @@ Kites `decode()`, `encode()`, or arithmetic functions.
 
 The C++ files in this directory are adapters only. They expose Kites outputs to
 the Python oracle; they do not define expected posit values. The C++ adapters
-are `posit_decode_dump.cpp`, `posit_encode_cli.cpp`, and `posit_arith_cli.cpp`.
+are `posit_decode_dump.cpp`, `posit_encode_cli.cpp`, `posit_arith_cli.cpp`, and
+`posit_conversion_cli.cpp`.
 
 ## Build the adapters
 
@@ -20,6 +21,8 @@ mkdir -p /tmp/posit-reference-build
 g++ -std=c++20 -O2 -Wall -Wextra -Werror -Isrc src/processor/posit.cpp test/posit_reference/posit_decode_dump.cpp -o /tmp/posit-reference-build/posit_decode_dump
 g++ -std=c++20 -O2 -Wall -Wextra -Werror -Isrc src/processor/posit.cpp test/posit_reference/posit_encode_cli.cpp -o /tmp/posit-reference-build/posit_encode_cli
 g++ -std=c++20 -O2 -Wall -Wextra -Werror -Isrc src/processor/posit.cpp test/posit_reference/posit_arith_cli.cpp -o /tmp/posit-reference-build/posit_arith_cli
+g++ -std=c++20 -O2 -Wall -Wextra -Werror -Isrc src/processor/posit.cpp test/posit_reference/posit_conversion_cli.cpp -o /tmp/posit-reference-build/posit_conversion_cli
+g++ -std=c++20 -O2 -Wall -Wextra -Werror -Isrc src/common/instructions.cpp src/assembler/code_generator.cpp test/posit_reference/posit_instruction_encoding_check.cpp -o /tmp/posit-reference-build/posit_instruction_encoding_check
 ```
 
 ## Run the independent comparisons
@@ -31,6 +34,8 @@ python3 test/posit_reference/posit_standard_encode_roundtrip.py /tmp/posit-refer
 python3 test/posit_reference/posit_standard_round_check.py /tmp/posit-reference-build/posit_encode_cli
 python3 test/posit_reference/posit_standard_arithmetic_check.py /tmp/posit-reference-build/posit_arith_cli
 python3 test/posit_reference/posit_targeted_cases.py /tmp/posit-reference-build/posit_arith_cli
+python3 test/posit_reference/posit_standard_conversion_check.py /tmp/posit-reference-build/posit_conversion_cli
+/tmp/posit-reference-build/posit_instruction_encoding_check
 ```
 
 The rounding checker covers all 32,766 positive and all 32,766 negative
@@ -39,6 +44,13 @@ thresholds it constructs the lower numeric raw code `U`, appends the `1` bit
 to form the 17-bit code, and applies the lower `U` LSB rule directly. The
 arithmetic oracle uses the same exact Standard rule and deterministic pair
 sampling with seed `20261109`.
+
+The conversion oracle compares binary32-to-Posit at every positive and negative
+U1 threshold after exactly converting each threshold to a binary32 bit pattern.
+It also checks all 65,536 Posit inputs for Posit-to-int and Posit-to-binary32,
+and a deterministic plus boundary-focused set of int32-to-Posit conversions.
+Its expected values are derived with Python `fractions.Fraction`, including
+direct construction of negative U1 thresholds.
 
 ## Strict compile and UBSan
 

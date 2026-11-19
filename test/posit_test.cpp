@@ -21,8 +21,8 @@ TEST(Posit16Test, DecodesSpecialAndBoundaryValues)
 
     const auto negativeOne = Kites::posit::decode(0xc000);
     EXPECT_TRUE(negativeOne.negative);
-    EXPECT_EQ(negativeOne.significand, 1);
-    EXPECT_EQ(negativeOne.scale, 0);
+    EXPECT_EQ(negativeOne.significand, 2048);
+    EXPECT_EQ(negativeOne.scale, -11);
 }
 
 TEST(Posit16Test, EncodesKnownPowersAndSigns)
@@ -122,4 +122,32 @@ TEST(Posit16Test, ArithmeticMatchesPreviouslyFailingStandardCases)
     // Corresponding negative-side results.
     EXPECT_EQ(mul(0x8345, 0x7fbb), 0x8003);
     EXPECT_EQ(mul(0x000c, 0xffd0), 0xffff);
+}
+
+TEST(Posit16Test, StandardIntegerAndBinary32Conversions)
+{
+    using namespace Kites::posit;
+    EXPECT_EQ(toInt32(0x4000), 1u);
+    EXPECT_EQ(toInt32(0x4400), 2u); // 1.5 ties to even
+    EXPECT_EQ(toInt32(0xbc00), static_cast<uint32_t>(-2)); // -1.5 ties to even
+    EXPECT_EQ(toInt32(0x3800), 0u); // +0.5 ties to even
+    EXPECT_EQ(toInt32(0xc800), 0u); // -0.5 ties to even
+    EXPECT_EQ(toInt32(0x8000), 0x80000000u);
+    EXPECT_EQ(toInt32(0x7fff), 0x80000000u); // outside int32 range
+    EXPECT_EQ(toInt32(0x8001), 0x80000000u); // outside int32 range
+    EXPECT_EQ(fromInt32(0x80000000u), 0x8000u);
+    EXPECT_EQ(fromInt32(1), 0x4000u);
+    EXPECT_EQ(fromFloat32Bits(0x00000000), 0x0000u);
+    EXPECT_EQ(fromFloat32Bits(0x80000000), 0x0000u);
+    EXPECT_EQ(fromFloat32Bits(0x7f800000), 0x8000u);
+    EXPECT_EQ(fromFloat32Bits(0xff800000), 0x8000u);
+    EXPECT_EQ(fromFloat32Bits(0x7fc00001), 0x8000u);
+    EXPECT_EQ(fromFloat32Bits(0x00000001), 0x0001u);
+    EXPECT_EQ(fromFloat32Bits(0x80000001), 0xffffu);
+    EXPECT_EQ(fromFloat32Bits(0x7f7fffff), 0x7fffu);
+    EXPECT_EQ(fromFloat32Bits(0xff7fffff), 0x8001u);
+    EXPECT_EQ(toFloat32Bits(0), 0x00000000u);
+    EXPECT_EQ(toFloat32Bits(0x8000), 0x7fc00000u);
+    EXPECT_EQ(toFloat32Bits(0x4000), 0x3f800000u);
+    EXPECT_EQ(toFloat32Bits(0xc000), 0xbf800000u);
 }

@@ -25,4 +25,13 @@ uint16_t add(uint16_t lhs, uint16_t rhs);
 uint16_t sub(uint16_t lhs, uint16_t rhs);
 uint16_t mul(uint16_t lhs, uint16_t rhs);
 uint16_t div(uint16_t lhs, uint16_t rhs);
+
+/// Convert Posit16 to signed 32-bit using nearestInt (ties to even).
+uint32_t toInt32(uint16_t bits);
+/// Convert the two's-complement int32 bit pattern to Posit16.
+uint16_t fromInt32(uint32_t bits);
+/// Convert IEEE-754 binary32 bits to Posit16 using exact Section 4.1 rounding.
+uint16_t fromFloat32Bits(uint32_t bits);
+/// Convert Posit16 to binary32 bits; finite inputs are exact.
+uint32_t toFloat32Bits(uint16_t bits);
 } // namespace Kites::posit

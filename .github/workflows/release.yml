@@ -59,8 +59,17 @@ jobs:
       # Configure CMake
       # --------------------------------------------
       - name: Configure
+        if: runner.os != 'Windows'
         run: >-
-          cmake -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_CXX_STANDARD=20 -DCMAKE_CXX_STANDARD_REQUIRED=ON 
+          cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_CXX_STANDARD=20 -DCMAKE_CXX_STANDARD_REQUIRED=ON
+
+      - name: Configure CMake (MinGW)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: >-
+          cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release
+          -DCMAKE_PREFIX_PATH="$env:QT_ROOT_DIR"
+          -DCMAKE_C_COMPILER=gcc -DCMAKE_CXX_COMPILER=g++
 
       # --------------------------------------------
       # Build
@@ -120,42 +129,63 @@ jobs:
         if: runner.os == 'Windows'
         shell: pwsh
         run: |
-          $packageDir = "Kites-$env:GITHUB_REF_NAME-windows"
+          $packageDir = "Kites-Posit-Windows"
           New-Item -ItemType Directory -Force -Path $packageDir | Out-Null
           Copy-Item "build\Kites.exe" $packageDir
+          @"
+          Kites Posit Extension for Windows
+          Version: $env:GITHUB_REF_NAME
+          Qt version: ${{ matrix.qt_version }}
+          Qt kit: ${{ matrix.qt_arch }}
+
+          To run Kites, extract this ZIP and double-click Kites.exe.
+          No Qt installation or development tools are required.
+          "@ | Set-Content -Path "$packageDir\README.txt" -Encoding utf8
 
       - name: Run windeployqt
         if: runner.os == 'Windows'
-        shell: cmd
-        run: |
-          windeployqt Kites-%GITHUB_REF_NAME%-windows\Kites.exe
-
-
-      # --------------------------------------------------------
-      # Copy MinGW Runtime DLLs
-      # --------------------------------------------------------
-
-      - name: Copy MinGW Runtime DLLs
-        if: runner.os == 'Windows'
         shell: pwsh
         run: |
-          $gccPath = Split-Path (Get-Command g++.exe).Source
-          $packageDir = "Kites-$env:GITHUB_REF_NAME-windows"
-
-          Copy-Item "$gccPath\libgcc_s_seh-1.dll" $packageDir
-          Copy-Item "$gccPath\libstdc++-6.dll" $packageDir
-          Copy-Item "$gccPath\libwinpthread-1.dll" $packageDir
+          $packageDir = "Kites-Posit-Windows"
+          & "$env:QT_ROOT_DIR\bin\windeployqt.exe" --release --compiler-runtime "$packageDir\Kites.exe"
 
       - name: Zip Windows Package
         if: runner.os == 'Windows'
-        shell: powershell
+        shell: pwsh
         run: |
-          $packageDir = "Kites-$env:GITHUB_REF_NAME-windows"
-          $archiveName = "kites-windows-$env:GITHUB_REF_NAME.zip"
+          $packageDir = "Kites-Posit-Windows"
+          $archiveName = "Kites-Posit-Windows.zip"
           "ARCHIVE_NAME=$archiveName" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
           Compress-Archive `
             -Path "$packageDir\*" `
             -DestinationPath $archiveName
+
+      - name: Smoke test extracted Windows ZIP without Qt/toolchain PATH
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $smokeDir = Join-Path $env:RUNNER_TEMP "Kites-Portable-Smoke"
+          Expand-Archive -Path $env:ARCHIVE_NAME -DestinationPath $smokeDir -Force
+          $packageDir = (Resolve-Path $smokeDir).Path
+          $oldPath = $env:PATH
+          $oldQtRoot = $env:QT_ROOT_DIR
+          $oldPluginPath = $env:QT_PLUGIN_PATH
+          $oldQpaPath = $env:QT_QPA_PLATFORM_PLUGIN_PATH
+          try {
+            $env:PATH = (($oldPath -split ';' | Where-Object { $_ -and $_ -notlike "$oldQtRoot*" -and $_ -notmatch 'mingw' }) -join ';')
+            Remove-Item Env:QT_ROOT_DIR -ErrorAction SilentlyContinue
+            Remove-Item Env:QT_PLUGIN_PATH -ErrorAction SilentlyContinue
+            Remove-Item Env:QT_QPA_PLATFORM_PLUGIN_PATH -ErrorAction SilentlyContinue
+            $process = Start-Process -FilePath "$packageDir\Kites.exe" -WorkingDirectory $packageDir -PassThru
+            Start-Sleep -Seconds 5
+            if ($process.HasExited) { throw "Kites exited during portable ZIP smoke test (code $($process.ExitCode))." }
+            Stop-Process -Id $process.Id -Force
+          } finally {
+            $env:PATH = $oldPath
+            $env:QT_ROOT_DIR = $oldQtRoot
+            if ($oldPluginPath) { $env:QT_PLUGIN_PATH = $oldPluginPath }
+            if ($oldQpaPath) { $env:QT_QPA_PLATFORM_PLUGIN_PATH = $oldQpaPath }
+          }
 
       # ============================================
       # MACOS PACKAGING
@@ -181,3 +211,4 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           files: ${{ env.ARCHIVE_NAME }}
+          generate_release_notes: true

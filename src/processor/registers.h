@@ -17,7 +17,7 @@
 namespace Kites
 {
 /**
- * @brief Represents a register file containing integer, floating-point, and vector registers.
+ * @brief Represents a register file containing integer, floating-point and Posit registers.
  */
 class RegisterFile : public QObject
 {
@@ -44,6 +44,7 @@ class RegisterFile : public QObject
         INVALID,        ///< Invalid register type.
         INTEGER,        ///< General-purpose integer register.
         FLOATING_POINT, ///< Floating-point register.
+        POSIT,          ///< Posit register.
         VECTOR,         ///< Vector register.
         CSR             ///< Control and Status Register (CSR).
     };
@@ -113,6 +114,7 @@ class RegisterFile : public QObject
 extern const std::unordered_set<std::string> valid_general_purpose_registers;
 
 extern const std::unordered_set<std::string> valid_floating_point_registers;
+extern const std::unordered_set<std::string> valid_posit_registers;
 
 extern const std::unordered_set<std::string> valid_csr_registers;
 
@@ -126,6 +128,7 @@ extern const std::unordered_map<std::string, std::string> reg_alias_to_name;
 bool IsValidGeneralPurposeRegister(const std::string &reg);
 
 bool IsValidFloatingPointRegister(const std::string &reg);
+bool IsValidPositRegister(const std::string &reg);
 
 bool IsValidCsr(const std::string &reg);
 }//namespace Kites

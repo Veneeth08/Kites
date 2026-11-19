@@ -321,4 +321,76 @@ uint16_t div(uint16_t lhs, uint16_t rhs)
     result.denominator = multiply(left.denominator, right.numerator);
     return roundFraction(result);
 }
+
+uint32_t toInt32(uint16_t bits)
+{
+    const Decoded d = decode(bits);
+    if (d.nar) return 0x80000000u;
+    if (d.significand == 0) return 0;
+
+    uint64_t magnitude = d.significand;
+    if (d.scale >= 0)
+    {
+        if (d.scale >= 32 || magnitude > (uint64_t{1} << 31) >> d.scale)
+            return 0x80000000u;
+        magnitude <<= static_cast<unsigned>(d.scale);
+    }
+    else
+    {
+        const unsigned shift = static_cast<unsigned>(-d.scale);
+        uint64_t whole = shift >= 64 ? 0 : magnitude >> shift;
+        const uint64_t remainder = shift >= 64 ? magnitude :
+                                   magnitude & ((uint64_t{1} << shift) - 1);
+        const bool aboveHalf = shift < 64 &&
+            remainder > (uint64_t{1} << (shift - 1));
+        const bool tie = shift < 64 &&
+            remainder == (uint64_t{1} << (shift - 1));
+        if (aboveHalf || (tie && (whole & 1))) ++whole;
+        magnitude = whole;
+    }
+
+    const uint64_t limit = d.negative ? uint64_t{1} << 31 : INT32_MAX;
+    if (magnitude > limit) return 0x80000000u;
+    const int64_t signedValue = d.negative ? -static_cast<int64_t>(magnitude)
+                                           : static_cast<int64_t>(magnitude);
+    return static_cast<uint32_t>(static_cast<int32_t>(signedValue));
+}
+
+uint16_t fromInt32(uint32_t bits)
+{
+    if (bits == 0x80000000u) return NAR;
+    const bool negative = (bits >> 31) != 0;
+    const uint64_t magnitude = negative ? static_cast<uint64_t>(~bits + 1u) : bits;
+    return encode(negative, magnitude, 0);
+}
+
+uint16_t fromFloat32Bits(uint32_t bits)
+{
+    const bool negative = (bits >> 31) != 0;
+    const uint32_t exponent = (bits >> 23) & 0xff;
+    const uint32_t fraction = bits & 0x7fffff;
+    if (exponent == 0xff) return NAR;
+    if (exponent == 0 && fraction == 0) return 0;
+    if (exponent == 0)
+        return encode(negative, fraction, -149);
+    return encode(negative, (uint32_t{1} << 23) | fraction,
+                  static_cast<int>(exponent) - 127 - 23);
+}
+
+uint32_t toFloat32Bits(uint16_t bits)
+{
+    const Decoded d = decode(bits);
+    if (d.nar) return 0x7fc00000u;
+    if (d.significand == 0) return 0;
+
+    uint32_t significand = d.significand;
+    int top = 31;
+    while (((significand >> top) & 1u) == 0u) --top;
+    const int unbiased = top + d.scale;
+    const uint32_t sign = d.negative ? 0x80000000u : 0u;
+    // All nonzero Posit16 ES=2 values are normal and exactly representable in binary32.
+    const uint32_t normalized = significand << (23 - top);
+    return sign | (static_cast<uint32_t>(unbiased + 127) << 23) |
+           (normalized & 0x7fffffu);
+}
 } // namespace Kites::posit

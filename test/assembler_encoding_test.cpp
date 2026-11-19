@@ -130,6 +130,38 @@ TEST(AssemblerEncoding, EcallAndEbreakDisassembleBack)
     EXPECT_NE(disassemble(encodeOne("ebreak")).find("ebreak"), std::string::npos);
 }
 
+TEST(AssemblerEncoding, PositInstructionBitPatterns)
+{
+    expectEncodings({
+        {"padd p3, p1, p2", 0x0020818bu}, {"psub p3, p1, p2", 0x0020918bu},
+        {"pmul p3, p1, p2", 0x0020a18bu}, {"pdiv p3, p1, p2", 0x0020b18bu},
+        {"pcvt.s.p f5, p4", 0x0202028bu}, {"pcvt.p.s p5, f4", 0x0202128bu},
+        {"pcvt.w.p x5, p4", 0x0202228bu}, {"pcvt.p.w p5, x4", 0x0202328bu},
+        {"plh p6, -2(x7)", 0xffe3c30bu}, {"psh p8, -4(x9)", 0xfe84de0bu},
+    });
+    EXPECT_EQ(encodeOne("padd p31, p0, p30"), 0x01e00f8bu);
+}
+
+TEST(AssemblerEncoding, PositRegisterClassAndImmediateValidation)
+{
+    EXPECT_THROW(assembleSource("padd x3, p1, p2\n"), std::runtime_error);
+    EXPECT_THROW(assembleSource("pcvt.s.p p5, p4\n"), std::runtime_error);
+    EXPECT_THROW(assembleSource("plh p1, 2048(x2)\n"), std::runtime_error);
+    EXPECT_THROW(assembleSource("psh p1, -2049(x2)\n"), std::runtime_error);
+    const uint32_t raw = encodeOne("pcvt.s.p f5, p4");
+    EXPECT_EQ(Kites::instruction_set::disassemble(raw), "pcvt.s.p f5, p4");
+    EXPECT_EQ(Kites::instruction_set::disassemble(encodeOne("plh p6, -2(x7)")),
+              "plh p6, -2(x7)");
+    for (const std::string &source : {"padd p3, p1, p2", "psub p3, p1, p2",
+                                      "pmul p3, p1, p2", "pdiv p3, p1, p2",
+                                      "pcvt.s.p f5, p4", "pcvt.p.s p5, f4",
+                                      "pcvt.w.p x5, p4", "pcvt.p.w p5, x4",
+                                      "plh p6, -2(x7)", "psh p8, -4(x9)"})
+    {
+        EXPECT_EQ(Kites::instruction_set::disassemble(encodeOne(source)), source);
+    }
+}
+
 TEST(AssemblerEncoding, SystemInstructionsMixWithOthers)
 {
     auto program =

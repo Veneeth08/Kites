@@ -375,7 +375,8 @@ static const std::unordered_set<std::string> valid_instructions = {
     "fld", "fsd", "fmadd.d", "fmsub.d", "fnmsub.d", "fnmadd.d", "fadd.d", "fsub.d", "fmul.d",
     "fdiv.d", "fsqrt.d", "fsgnj.d", "fsgnjn.d", "fsgnjx.d", "fmin.d", "fmax.d", "fcvt.s.d",
     "fcvt.d.s", "feq.d", "flt.d", "fle.d", "fclass.d", "fcvt.w.d", "fcvt.wu.d", "fcvt.d.w",
-    "fcvt.d.wu", "fcvt.l.d", "fcvt.lu.d", "fmv.x.d", "fcvt.d.l", "fcvt.d.lu", "fmv.d.x"
+    "fcvt.d.wu", "fcvt.l.d", "fcvt.lu.d", "fmv.x.d", "fcvt.d.l", "fcvt.d.lu", "fmv.d.x",
+    "padd", "psub", "pmul", "pdiv", "pcvt.s.p", "pcvt.p.s", "pcvt.w.p", "pcvt.p.w", "plh", "psh"
 
 };
 
@@ -764,6 +765,11 @@ std::unordered_map<std::string, FDSTypeInstructionEncoding> F_D_S_type_instructi
     IL -> Instruction Label
 */
 std::unordered_map<std::string, std::vector<SyntaxType>> instruction_syntax_map = {
+    {"padd", {SyntaxType::O_POSIT}}, {"psub", {SyntaxType::O_POSIT}},
+    {"pmul", {SyntaxType::O_POSIT}}, {"pdiv", {SyntaxType::O_POSIT}},
+    {"pcvt.s.p", {SyntaxType::O_POSIT}}, {"pcvt.p.s", {SyntaxType::O_POSIT}},
+    {"pcvt.w.p", {SyntaxType::O_POSIT}}, {"pcvt.p.w", {SyntaxType::O_POSIT}},
+    {"plh", {SyntaxType::O_POSIT}}, {"psh", {SyntaxType::O_POSIT}},
     {"add", {SyntaxType::O_GPR_C_GPR_C_GPR}},
     {"sub", {SyntaxType::O_GPR_C_GPR_C_GPR}},
     {"xor", {SyntaxType::O_GPR_C_GPR_C_GPR}},
@@ -984,6 +990,14 @@ std::unordered_map<std::string, std::vector<SyntaxType>> instruction_syntax_map 
 bool isValidInstruction(const std::string &instruction)
 {
     return valid_instructions.find(instruction) != valid_instructions.end();
+}
+
+bool isPositInstruction(const std::string &instruction)
+{
+    static const std::unordered_set<std::string> names = {
+        "padd", "psub", "pmul", "pdiv", "pcvt.s.p", "pcvt.p.s", "pcvt.w.p",
+        "pcvt.p.w", "plh", "psh"};
+    return names.find(instruction) != names.end();
 }
 
 bool isValidRTypeInstruction(const std::string &instruction)
@@ -1258,6 +1272,7 @@ std::string getExpectedSyntaxes(const std::string &opcode)
     }
 
     static const std::unordered_map<SyntaxType, std::string> syntaxTypeToString = {
+        {SyntaxType::O_POSIT, "Posit register operands"},
         {SyntaxType::O, "<empty>"},
         {SyntaxType::O_GPR_C_GPR_C_GPR, "<gp-reg>, <gp-reg>, <gp-reg>"},
         {SyntaxType::O_GPR_C_GPR_C_I, "<gp-reg>, <gp-reg>, <imm>"},
@@ -1303,6 +1318,17 @@ std::string getExpectedSyntaxes(const std::string &opcode)
 
 InstructionType getInstructionType(const std::string &instruction)
 {
+    // Posit operations use R-shaped arithmetic/conversion encodings and the
+    // standard I/S immediate layouts for their memory operations.
+    if (isPositInstruction(instruction))
+    {
+        if (instruction == "plh")
+            return InstructionType::I_TYPE;
+        if (instruction == "psh")
+            return InstructionType::S_TYPE;
+        return InstructionType::R_TYPE;
+    }
+
     // Check each instruction type
     if (isValidRTypeInstruction(instruction))
         return InstructionType::R_TYPE;
@@ -1364,10 +1390,21 @@ std::string disassemble(uint32_t instruction)
 
     auto xr = [](uint8_t r) { return "x" + std::to_string(r); };
     auto fr = [](uint8_t r) { return "f" + std::to_string(r); };
+    auto pr = [](uint8_t r) { return "p" + std::to_string(r); };
     auto signext = [](int32_t v, int b) -> int32_t { return (v << (32 - b)) >> (32 - b); };
 
     auto immI = [&] { return signext((int32_t)(instruction >> 20), 12); };
     auto immS = [&] { return signext((funct7 << 5) | rd, 12); };
+    auto positImmI = [&]
+    {
+        const uint32_t raw = (instruction >> 20) & 0xfffu;
+        return (raw & 0x800u) ? static_cast<int32_t>(raw) - 4096 : static_cast<int32_t>(raw);
+    };
+    auto positImmS = [&]
+    {
+        const uint32_t raw = ((instruction >> 25) << 5 | rd) & 0xfffu;
+        return (raw & 0x800u) ? static_cast<int32_t>(raw) - 4096 : static_cast<int32_t>(raw);
+    };
     auto immB = [&]
     {
         return signext(
@@ -1392,6 +1429,27 @@ std::string disassemble(uint32_t instruction)
 
     switch (opcode)
     {
+
+    case 0x0b:
+    {
+        if (funct3 <= 3 && funct7 == 0)
+        {
+            static const char *ops[] = {"padd", "psub", "pmul", "pdiv"};
+            return std::string(ops[funct3]) + " " + pr(rd) + ", " + pr(rs1) + ", " + pr(rs2);
+        }
+        if (funct3 <= 3 && funct7 == 1 && rs2 == 0)
+        {
+            static const char *ops[] = {"pcvt.s.p", "pcvt.p.s", "pcvt.w.p", "pcvt.p.w"};
+            const std::string dst = funct3 == 0 ? fr(rd) : (funct3 == 2 ? xr(rd) : pr(rd));
+            const std::string src = funct3 == 1 ? fr(rs1) : (funct3 == 3 ? xr(rs1) : pr(rs1));
+            return std::string(ops[funct3]) + " " + dst + ", " + src;
+        }
+        if (funct3 == 4)
+            return "plh " + pr(rd) + ", " + std::to_string(positImmI()) + "(" + xr(rs1) + ")";
+        if (funct3 == 5)
+            return "psh " + pr(rs2) + ", " + std::to_string(positImmS()) + "(" + xr(rs1) + ")";
+        break;
+    }
 
     case 0b0110011:
     { // R-type integer
@@ -1851,7 +1909,6 @@ std::string disassemble(uint32_t instruction)
         // fcvt from int
         if ((funct7 & ~1) == 0b1101000)
         {
-            static const char *fromInt[] = {"fcvt", "fcvt", "fcvt", "fcvt"};
             static const char *fromIntSrc[] = {".w.", ".wu.", ".l.", ".lu."};
             if (rs2 < 4)
                 return "fcvt" + suf + fromIntSrc[rs2] + (suf == ".s" ? "s" : "d") + // handled below

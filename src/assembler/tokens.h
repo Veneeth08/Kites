@@ -25,6 +25,7 @@ enum class TokenType
     OPCODE,       ///< Opcode in an instruction
     GP_REGISTER,  ///< General-purpose register
     FP_REGISTER,  ///< Floating-point register
+    P_REGISTER,   ///< Posit register
     VEC_REGISTER, ///< Vector register
     CSR_REGISTER, ///< Control and Status Register
     NUM,          ///< Numeric value

@@ -22,6 +22,9 @@ class RegisterModel : public QAbstractTableModel
     QVariant headerData(int section, Qt::Orientation orientation,
                         int role = Qt::DisplayRole) const override;
     QVariant data(const QModelIndex &index, int role = Qt::DisplayRole) const override;
+    Qt::ItemFlags flags(const QModelIndex &index) const override;
+    bool setData(const QModelIndex &index, const QVariant &value,
+                 int role = Qt::EditRole) override;
 
     void setDisplayBase(Base base);
     void changeRegisterFile(RegisterFile *regfile);
@@ -34,6 +37,7 @@ class RegisterModel : public QAbstractTableModel
     void updateRegisterValue(size_t regIndex, uint64_t value);
     void registerResetSlot();
     void updateFRegisterValue(size_t regIndex, uint64_t value);
+    void updatePRegisterValue(size_t regIndex, uint16_t value);
 };
 
 } // namespace Kites

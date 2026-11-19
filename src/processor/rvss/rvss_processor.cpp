@@ -5,6 +5,7 @@
  */
 
 #include "processor/rvss/rvss_processor.h"
+#include "processor/posit.h"
 
 #include "common/instructions.h"
 #include "config/config.h"
@@ -177,6 +178,114 @@ void RVSSProcessor::Execute()
 {
     uint8_t opcode = current_instruction_ & 0b1111111;
     uint8_t funct3 = (current_instruction_ >> 12) & 0b111;
+
+    // The remaining custom opcode spaces are intentionally unallocated.
+    if (opcode == 0x2b || opcode == 0x5b || opcode == 0x7b)
+    {
+        std::cerr << "Illegal unallocated custom instruction 0x" << std::hex
+                  << current_instruction_ << std::dec << std::endl;
+        output_status_ = "VM_ILLEGAL_INSTRUCTION";
+        stop_requested_ = true;
+        return;
+    }
+
+    if (opcode == 0x0b)
+    {
+        const uint8_t rd = (current_instruction_ >> 7) & 0x1f;
+        const uint8_t rs1 = (current_instruction_ >> 15) & 0x1f;
+        const uint8_t rs2 = (current_instruction_ >> 20) & 0x1f;
+        const uint8_t funct7 = (current_instruction_ >> 25) & 0x7f;
+        const uint64_t pc = program_counter_ >= 4 ? program_counter_ - 4 : 0;
+        auto illegal = [&]()
+        {
+            std::cerr << "Illegal Posit instruction 0x" << std::hex << current_instruction_
+                      << " at PC 0x" << pc << std::dec << std::endl;
+            output_status_ = "VM_ILLEGAL_INSTRUCTION";
+            stop_requested_ = true;
+        };
+        if (funct3 <= 3 && funct7 == 0)
+        {
+            const uint16_t lhs = registers_.ReadPreg(rs1), rhs = registers_.ReadPreg(rs2);
+            uint16_t result = 0;
+            switch (funct3)
+            {
+            case 0: result = posit::add(lhs, rhs); break;
+            case 1: result = posit::sub(lhs, rhs); break;
+            case 2: result = posit::mul(lhs, rhs); break;
+            default: result = posit::div(lhs, rhs); break;
+            }
+            const uint16_t old = registers_.ReadPreg(rd);
+            registers_.WritePreg(rd, result);
+            if (old != result) current_delta_.register_changes.push_back({rd, 3, old, result});
+            return;
+        }
+        if (funct3 <= 3 && funct7 == 1)
+        {
+            if (rs2 != 0) { illegal(); return; }
+            const uint64_t oldP = registers_.ReadPreg(rd);
+            const uint64_t oldF = registers_.ReadFpr(rd);
+            const uint64_t oldG = registers_.ReadGpr(rd);
+            if (funct3 == 0)
+            {
+                const uint64_t value = posit::toFloat32Bits(registers_.ReadPreg(rs1));
+                registers_.WriteFpr(rd, value);
+                if (oldF != value) current_delta_.register_changes.push_back({rd, 2, oldF, value});
+            }
+            else if (funct3 == 1)
+            {
+                const uint16_t value = posit::fromFloat32Bits(
+                    static_cast<uint32_t>(registers_.ReadFpr(rs1)));
+                registers_.WritePreg(rd, value);
+                if (oldP != value) current_delta_.register_changes.push_back({rd, 3, oldP, value});
+            }
+            else if (funct3 == 2)
+            {
+                const uint32_t bits = posit::toInt32(registers_.ReadPreg(rs1));
+                const int64_t value = (bits & 0x80000000u)
+                    ? static_cast<int64_t>(bits) - 0x100000000LL : bits;
+                registers_.WriteGpr(rd, static_cast<uint64_t>(value));
+                const uint64_t valueBits = registers_.ReadGpr(rd);
+                if (oldG != valueBits) current_delta_.register_changes.push_back({rd, 0, oldG, valueBits});
+            }
+            else
+            {
+                const uint16_t value = posit::fromInt32(static_cast<uint32_t>(registers_.ReadGpr(rs1)));
+                registers_.WritePreg(rd, value);
+                if (oldP != value) current_delta_.register_changes.push_back({rd, 3, oldP, value});
+            }
+            return;
+        }
+        if (funct3 == 4 || funct3 == 5)
+        {
+            const uint32_t rawImm = funct3 == 4
+                ? (current_instruction_ >> 20) & 0xfff
+                : (((current_instruction_ >> 25) << 5) | rd) & 0xfff;
+            const int32_t offset = (rawImm & 0x800) ? static_cast<int32_t>(rawImm) - 4096
+                                                    : static_cast<int32_t>(rawImm);
+            const uint64_t address = registers_.ReadGpr(rs1) + static_cast<int64_t>(offset);
+            if (funct3 == 4)
+            {
+                const uint16_t value = memory_controller_.readHalfWord(address);
+                const uint16_t old = registers_.ReadPreg(rd);
+                registers_.WritePreg(rd, value);
+                if (old != value) current_delta_.register_changes.push_back({rd, 3, old, value});
+            }
+            else
+            {
+                const uint8_t storeReg = rs2;
+                const uint16_t value = registers_.ReadPreg(storeReg);
+                const std::vector<uint8_t> before = {memory_controller_.peekByte(address),
+                                                     memory_controller_.peekByte(address + 1)};
+                memory_controller_.writeHalfWord(address, value);
+                const std::vector<uint8_t> after = {memory_controller_.peekByte(address),
+                                                    memory_controller_.peekByte(address + 1)};
+                if (before != after) current_delta_.memory_changes.push_back({address, before, after});
+            }
+            return;
+        }
+        illegal();
+        return;
+    }
 
     if (opcode == 0b1110011 && funct3 == 0b000)
     {
@@ -1235,6 +1344,11 @@ void RVSSProcessor::Undo()
         case 2:
         { // FPR
             registers_.WriteFpr(change.reg_index, change.old_value);
+            break;
+        }
+        case 3:
+        { // PPR
+            registers_.WritePreg(change.reg_index, static_cast<uint16_t>(change.old_value));
             break;
         }
         default:

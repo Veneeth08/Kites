@@ -69,6 +69,80 @@ void Parser::recordError(const ParseError &error)
     errors_.count++;
 }
 
+bool Parser::parsePositInstruction()
+{
+    const std::string op = currentToken().value;
+    const unsigned line = currentToken().line_number;
+    auto tokenIs = [&](int n, TokenType type)
+    {
+        return peekToken(n).line_number == line && peekToken(n).type == type;
+    };
+    auto endAt = [&](int n)
+    {
+        return peekToken(n).type == TokenType::EOF_ || peekToken(n).line_number != line;
+    };
+    auto canonical = [&](int n) -> std::string
+    {
+        return reg_alias_to_name.at(peekToken(n).value);
+    };
+    ICUnit block;
+    block.setOpcode(op);
+    block.setLineNumber(line);
+    block.setInstructionIndex(instruction_index_);
+
+    if (op == "padd" || op == "psub" || op == "pmul" || op == "pdiv")
+    {
+        if (!tokenIs(1, TokenType::P_REGISTER) || !tokenIs(2, TokenType::COMMA) ||
+            !tokenIs(3, TokenType::P_REGISTER) || !tokenIs(4, TokenType::COMMA) ||
+            !tokenIs(5, TokenType::P_REGISTER) || !endAt(6)) return false;
+        block.setRd(canonical(1)); block.setRs1(canonical(3)); block.setRs2(canonical(5));
+    }
+    else if (op == "pcvt.s.p" || op == "pcvt.p.s" || op == "pcvt.w.p" || op == "pcvt.p.w")
+    {
+        const TokenType dst = (op == "pcvt.s.p") ? TokenType::FP_REGISTER :
+                              (op == "pcvt.w.p") ? TokenType::GP_REGISTER : TokenType::P_REGISTER;
+        const TokenType src = (op == "pcvt.p.s") ? TokenType::FP_REGISTER :
+                              (op == "pcvt.p.w") ? TokenType::GP_REGISTER : TokenType::P_REGISTER;
+        if (!tokenIs(1, dst) || !tokenIs(2, TokenType::COMMA) || !tokenIs(3, src) || !endAt(4))
+            return false;
+        block.setRd(canonical(1)); block.setRs1(canonical(3));
+    }
+    else
+    {
+        if (!tokenIs(1, TokenType::P_REGISTER) || !tokenIs(2, TokenType::COMMA) ||
+            !tokenIs(3, TokenType::NUM) || !tokenIs(4, TokenType::LPAREN) ||
+            !tokenIs(5, TokenType::GP_REGISTER) || !tokenIs(6, TokenType::RPAREN) || !endAt(7))
+            return false;
+        int64_t imm;
+        const std::string literal = peekToken(3).value;
+        const size_t prefix = (!literal.empty() && literal[0] == '-') ? 1 : 0;
+        const bool hex = literal.size() > prefix + 2 && literal[prefix] == '0' &&
+                         (literal[prefix + 1] == 'x' || literal[prefix + 1] == 'X');
+        try { imm = std::stoll(literal, nullptr, hex ? 16 : 10); }
+        catch (...) { return false; }
+        if (imm < -2048 || imm > 2047)
+        {
+            recordError(ParseError(peekToken(3).line_number, "Immediate value out of range"));
+            errors_.all_errors.emplace_back(errors::ImmediateOutOfRangeError(
+                "Immediate value out of range", "Expected: -2048 <= imm <= 2047", filename_,
+                peekToken(3).line_number, peekToken(3).column_number,
+                sourceLine(peekToken(3).line_number)));
+            skipCurrentLine();
+            return true;
+        }
+        block.setImm(std::to_string(imm));
+        block.setRs1(canonical(5));
+        if (op == "plh") block.setRd(canonical(1));
+        else block.setRs2(canonical(1));
+    }
+
+    skipCurrentLine();
+    intermediate_code_.emplace_back(block, true);
+    instruction_number_line_number_mapping_[instruction_index_] = line;
+    ++instruction_index_;
+    return true;
+}
+
 //=================================================================================
 
 void Parser::parseDataDirective()
@@ -339,6 +413,11 @@ void Parser::parseTextDirective()
             {
                 switch (syntax)
                 {
+                case instruction_set::SyntaxType::O_POSIT:
+                {
+                    valid_syntax = parsePositInstruction();
+                    break;
+                }
                 case instruction_set::SyntaxType::O_GPR_C_GPR_C_GPR:
                 {
                     valid_syntax = parse_O_GPR_C_GPR_C_GPR();

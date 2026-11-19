@@ -117,6 +117,10 @@ void RegisterFile::ModifyRegister(const std::string &reg_name, uint64_t value)
     {
         WriteFpr(std::stoi(reg_name_n.substr(1)), value);
     }
+    else if (IsValidPositRegister(reg_name_n))
+    {
+        WritePreg(std::stoi(reg_name_n.substr(1)), static_cast<uint16_t>(value));
+    }
     else if (IsValidCsr(reg_name_n))
     {
         WriteCsr(csr_to_address.at(reg_name_n), value);
@@ -148,6 +152,11 @@ const std::unordered_set<std::string> valid_floating_point_registers = {
     "ft13", "ft14", "ft15", "ft16", "ft17", "ft18", "ft19", "ft20", "ft21", "ft22", "ft23",
     "ft24", "ft25", "ft26", "ft27", "ft28", "ft29", "ft30", "ft31",
 };
+
+const std::unordered_set<std::string> valid_posit_registers = {
+    "p0", "p1", "p2", "p3", "p4", "p5", "p6", "p7", "p8", "p9", "p10", "p11",
+    "p12", "p13", "p14", "p15", "p16", "p17", "p18", "p19", "p20", "p21", "p22",
+    "p23", "p24", "p25", "p26", "p27", "p28", "p29", "p30", "p31"};
 
 const std::unordered_set<std::string> valid_csr_registers = {"fflags", "frm", "fcsr"};
 
@@ -190,6 +199,14 @@ const std::unordered_map<std::string, std::string> reg_alias_to_name = {
     {"f25", "f25"},       {"f26", "f26"},  {"f27", "f27"},   {"f28", "f28"}, {"f29", "f29"},
     {"f30", "f30"},       {"f31", "f31"},
 
+    {"p0", "p0"}, {"p1", "p1"}, {"p2", "p2"}, {"p3", "p3"}, {"p4", "p4"},
+    {"p5", "p5"}, {"p6", "p6"}, {"p7", "p7"}, {"p8", "p8"}, {"p9", "p9"},
+    {"p10", "p10"}, {"p11", "p11"}, {"p12", "p12"}, {"p13", "p13"}, {"p14", "p14"},
+    {"p15", "p15"}, {"p16", "p16"}, {"p17", "p17"}, {"p18", "p18"}, {"p19", "p19"},
+    {"p20", "p20"}, {"p21", "p21"}, {"p22", "p22"}, {"p23", "p23"}, {"p24", "p24"},
+    {"p25", "p25"}, {"p26", "p26"}, {"p27", "p27"}, {"p28", "p28"}, {"p29", "p29"},
+    {"p30", "p30"}, {"p31", "p31"},
+
     {"fflags", "fflags"}, {"frm", "frm"},  {"fcsr", "fcsr"},
 
 };
@@ -202,6 +219,11 @@ bool IsValidGeneralPurposeRegister(const std::string &reg)
 bool IsValidFloatingPointRegister(const std::string &reg)
 {
     return valid_floating_point_registers.find(reg) != valid_floating_point_registers.end();
+}
+
+bool IsValidPositRegister(const std::string &reg)
+{
+    return valid_posit_registers.find(reg) != valid_posit_registers.end();
 }
 
 bool IsValidCsr(const std::string &reg)

@@ -151,6 +151,7 @@ class Parser
     bool parse_O_GPR_C_DL();
     bool parse_O_GPR_C_I_LP_GPR_RP();
     bool parse_O();
+    bool parsePositInstruction();
     bool parse_pseudo();
 
     bool parse_O_GPR_C_CSR_C_GPR();

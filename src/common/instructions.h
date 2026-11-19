@@ -414,6 +414,7 @@ struct FDSTypeInstructionEncoding
  */
 enum class SyntaxType
 {
+    O_POSIT,              ///< Posit-specific operand layout, validated by the Posit parser.
     O_GPR_C_GPR_C_GPR,   ///< Opcode general-register , general-register , register
     O_GPR_C_GPR_C_I,     ///< Opcode general-register , general-register , immediate
     O_GPR_C_I,           ///< Opcode general-register , immediate
@@ -486,6 +487,7 @@ extern std::unordered_map<std::string, FDSTypeInstructionEncoding>
 extern std::unordered_map<std::string, std::vector<SyntaxType>> instruction_syntax_map;
 
 bool isValidInstruction(const std::string &instruction);
+bool isPositInstruction(const std::string &instruction);
 
 bool isValidRTypeInstruction(const std::string &name);
 bool isValidITypeInstruction(const std::string &instruction);
