@@ -1,15 +1,17 @@
 # Posit16 ES=2 Independent Reference Checks
 
-These utilities compare Kites' Posit16 implementation with an independent
-Python oracle based on the *Posit Standard (2022)*. The Python oracle uses
-`fractions.Fraction`, parses the Standard's raw bit fields, evaluates its exact
-value equation, and applies Section 4.1 rounding. It does not import or call
-Kites `decode()`, `encode()`, or arithmetic functions.
+These utilities compare Kites' Posit16 implementation and Quire operations
+with independent Python oracles based on the *Posit Standard (2022)*. The
+Posit oracle uses `fractions.Fraction`, parses the Standard's raw bit fields,
+evaluates its exact value equation, and applies Section 4.1 rounding. The
+Quire checker uses Python arbitrary-precision integers and exact rationals.
+Neither oracle imports or calls Kites `decode()`, `encode()`, or arithmetic
+functions to calculate expected values.
 
 The C++ files in this directory are adapters only. They expose Kites outputs to
-the Python oracle; they do not define expected posit values. The C++ adapters
-are `posit_decode_dump.cpp`, `posit_encode_cli.cpp`, `posit_arith_cli.cpp`, and
-`posit_conversion_cli.cpp`.
+the Python oracles; they do not define expected values. The adapters are
+`posit_decode_dump.cpp`, `posit_encode_cli.cpp`, `posit_arith_cli.cpp`,
+`posit_conversion_cli.cpp`, and `posit_quire_cli.cpp`.
 
 ## Build the adapters
 
@@ -22,6 +24,7 @@ g++ -std=c++20 -O2 -Wall -Wextra -Werror -Isrc src/processor/posit.cpp test/posi
 g++ -std=c++20 -O2 -Wall -Wextra -Werror -Isrc src/processor/posit.cpp test/posit_reference/posit_encode_cli.cpp -o /tmp/posit-reference-build/posit_encode_cli
 g++ -std=c++20 -O2 -Wall -Wextra -Werror -Isrc src/processor/posit.cpp test/posit_reference/posit_arith_cli.cpp -o /tmp/posit-reference-build/posit_arith_cli
 g++ -std=c++20 -O2 -Wall -Wextra -Werror -Isrc src/processor/posit.cpp test/posit_reference/posit_conversion_cli.cpp -o /tmp/posit-reference-build/posit_conversion_cli
+g++ -std=c++20 -O2 -Wall -Wextra -Werror -Isrc src/processor/posit.cpp test/posit_reference/posit_quire_cli.cpp -o /tmp/posit-reference-build/posit_quire_cli
 g++ -std=c++20 -O2 -Wall -Wextra -Werror -Isrc src/common/instructions.cpp src/assembler/code_generator.cpp test/posit_reference/posit_instruction_encoding_check.cpp -o /tmp/posit-reference-build/posit_instruction_encoding_check
 ```
 
@@ -35,6 +38,7 @@ python3 test/posit_reference/posit_standard_round_check.py /tmp/posit-reference-
 python3 test/posit_reference/posit_standard_arithmetic_check.py /tmp/posit-reference-build/posit_arith_cli
 python3 test/posit_reference/posit_targeted_cases.py /tmp/posit-reference-build/posit_arith_cli
 python3 test/posit_reference/posit_standard_conversion_check.py /tmp/posit-reference-build/posit_conversion_cli
+python3 test/posit_reference/posit_quire_reference_check.py /tmp/posit-reference-build/posit_quire_cli
 /tmp/posit-reference-build/posit_instruction_encoding_check
 ```
 

@@ -1,9 +1,27 @@
 #pragma once
 
+#include <array>
 #include <cstdint>
 
 namespace Kites::posit
 {
+/// Posit16 Quire. limbs[0] contains bits 31:0; limbs[7] contains bits 255:224.
+/// The 256-bit two's-complement integer is scaled by 2^-112. The sole set-MSB
+/// pattern (0x8000...0000) is Quire NaR and is not a finite integer value.
+struct Quire256
+{
+    std::array<uint32_t, 8> limbs{};
+};
+
+Quire256 quireZero();
+Quire256 quireNaR();
+bool isQuireNaR(const Quire256 &value);
+/// Return q + a*b / q - a*b exactly. Overflow or any NaR operand yields NaR.
+Quire256 quireMulAdd(const Quire256 &q, uint16_t a, uint16_t b);
+Quire256 quireMulSub(const Quire256 &q, uint16_t a, uint16_t b);
+/// Round a finite Quire value to Posit16 using the existing exact U1 path.
+uint16_t quireToPosit(const Quire256 &value);
+
 /// Exact decoded form: (-1)^negative * significand * 2^scale.
 /// Zero has significand 0; NaR is reported separately.
 struct Decoded

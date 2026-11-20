@@ -17,6 +17,7 @@ namespace Kites
 {
 RegisterFile::RegisterFile(QObject *parent) : QObject(parent)
 {
+    qRegisterMetaType<posit::Quire256>("Kites::posit::Quire256");
 }
 
 void RegisterFile::Reset()
@@ -24,6 +25,8 @@ void RegisterFile::Reset()
     gpr_.fill(0);
     fpr_.fill(0.0);
     preg_.fill(0);
+    quire_ = posit::quireZero();
+    emit updateQuireValue(quire_);
     csr_.fill(0);
     csr_[0x002] = 0b000; // Default: RNE (IEEE 754)
     emit registerResetSignal();
@@ -80,6 +83,17 @@ void RegisterFile::WritePreg(size_t reg, uint16_t value)
 std::vector<uint16_t> RegisterFile::GetPregValues() const
 {
     return {preg_.begin(), preg_.end()};
+}
+
+const posit::Quire256 &RegisterFile::ReadQuire() const
+{
+    return quire_;
+}
+
+void RegisterFile::WriteQuire(const posit::Quire256 &value)
+{
+    quire_ = value;
+    emit updateQuireValue(quire_);
 }
 
 uint64_t RegisterFile::ReadCsr(size_t reg) const
@@ -156,7 +170,10 @@ const std::unordered_set<std::string> valid_floating_point_registers = {
 const std::unordered_set<std::string> valid_posit_registers = {
     "p0", "p1", "p2", "p3", "p4", "p5", "p6", "p7", "p8", "p9", "p10", "p11",
     "p12", "p13", "p14", "p15", "p16", "p17", "p18", "p19", "p20", "p21", "p22",
-    "p23", "p24", "p25", "p26", "p27", "p28", "p29", "p30", "p31"};
+    "p23", "p24", "p25", "p26", "p27", "p28", "p29", "p30", "p31",
+    "pt0", "pt1", "pt2", "pt3", "pt4", "pt5", "pt6", "pt7", "ps0", "ps1", "pa0",
+    "pa1", "pa2", "pa3", "pa4", "pa5", "pa6", "pa7", "ps2", "ps3", "ps4", "ps5",
+    "ps6", "ps7", "ps8", "ps9", "ps10", "ps11", "pt8", "pt9", "pt10", "pt11"};
 
 const std::unordered_set<std::string> valid_csr_registers = {"fflags", "frm", "fcsr"};
 
@@ -206,6 +223,14 @@ const std::unordered_map<std::string, std::string> reg_alias_to_name = {
     {"p20", "p20"}, {"p21", "p21"}, {"p22", "p22"}, {"p23", "p23"}, {"p24", "p24"},
     {"p25", "p25"}, {"p26", "p26"}, {"p27", "p27"}, {"p28", "p28"}, {"p29", "p29"},
     {"p30", "p30"}, {"p31", "p31"},
+
+    {"pt0", "p0"}, {"pt1", "p1"}, {"pt2", "p2"}, {"pt3", "p3"}, {"pt4", "p4"},
+    {"pt5", "p5"}, {"pt6", "p6"}, {"pt7", "p7"}, {"ps0", "p8"}, {"ps1", "p9"},
+    {"pa0", "p10"}, {"pa1", "p11"}, {"pa2", "p12"}, {"pa3", "p13"}, {"pa4", "p14"},
+    {"pa5", "p15"}, {"pa6", "p16"}, {"pa7", "p17"}, {"ps2", "p18"}, {"ps3", "p19"},
+    {"ps4", "p20"}, {"ps5", "p21"}, {"ps6", "p22"}, {"ps7", "p23"}, {"ps8", "p24"},
+    {"ps9", "p25"}, {"ps10", "p26"}, {"ps11", "p27"}, {"pt8", "p28"}, {"pt9", "p29"},
+    {"pt10", "p30"}, {"pt11", "p31"},
 
     {"fflags", "fflags"}, {"frm", "frm"},  {"fcsr", "fcsr"},
 

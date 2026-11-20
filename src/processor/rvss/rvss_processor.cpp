@@ -283,6 +283,38 @@ void RVSSProcessor::Execute()
             }
             return;
         }
+        if (funct3 == 6)
+        {
+            if (funct7 == 0 && rd == 0 && rs1 == 0 && rs2 == 0)
+            {
+                const posit::Quire256 oldValue = registers_.ReadQuire();
+                const posit::Quire256 newValue = posit::quireZero();
+                registers_.WriteQuire(newValue);
+                current_delta_.quire_change = QuireChange{oldValue, newValue};
+                return;
+            }
+            if ((funct7 == 1 || funct7 == 2) && rd == 0)
+            {
+                const posit::Quire256 oldValue = registers_.ReadQuire();
+                const uint16_t lhs = registers_.ReadPreg(rs1);
+                const uint16_t rhs = registers_.ReadPreg(rs2);
+                const posit::Quire256 newValue = funct7 == 1
+                    ? posit::quireMulAdd(oldValue, lhs, rhs)
+                    : posit::quireMulSub(oldValue, lhs, rhs);
+                registers_.WriteQuire(newValue);
+                current_delta_.quire_change = QuireChange{oldValue, newValue};
+                return;
+            }
+            if (funct7 == 3 && rs1 == 0 && rs2 == 0)
+            {
+                const uint16_t oldValue = registers_.ReadPreg(rd);
+                const uint16_t newValue = posit::quireToPosit(registers_.ReadQuire());
+                registers_.WritePreg(rd, newValue);
+                if (oldValue != newValue)
+                    current_delta_.register_changes.push_back({rd, 3, oldValue, newValue});
+                return;
+            }
+        }
         illegal();
         return;
     }
@@ -1357,6 +1389,9 @@ void RVSSProcessor::Undo()
         }
     }
 
+    if (last.quire_change)
+        registers_.WriteQuire(last.quire_change->old_value);
+
     for (const auto &change : last.memory_changes)
     {
         for (size_t i = 0; i < change.old_bytes_vec.size(); ++i)
@@ -1423,11 +1458,19 @@ void RVSSProcessor::Redo()
             registers_.WriteFpr(change.reg_index, change.new_value);
             break;
         }
+        case 3:
+        { // PPR
+            registers_.WritePreg(change.reg_index, static_cast<uint16_t>(change.new_value));
+            break;
+        }
         default:
             std::cerr << "Invalid register type: " << change.reg_type << std::endl;
             break;
         }
     }
+
+    if (next.quire_change)
+        registers_.WriteQuire(next.quire_change->new_value);
 
     for (const auto &change : next.memory_changes)
     {
@@ -1470,10 +1513,7 @@ void RVSSProcessor::Reset()
     csr_old_value_ = 0;
     csr_write_val_ = 0;
     csr_uimm_ = 0;
-    current_delta_.register_changes.clear();
-    current_delta_.memory_changes.clear();
-    current_delta_.old_pc = 0;
-    current_delta_.new_pc = 0;
+    current_delta_ = RVSingleStageStepDelta{};
     undo_stack_ = std::stack<StepDelta>();
     redo_stack_ = std::stack<StepDelta>();
 }

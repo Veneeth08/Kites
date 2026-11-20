@@ -135,7 +135,7 @@ TEST(Posit16Test, StandardIntegerAndBinary32Conversions)
     EXPECT_EQ(toInt32(0x8000), 0x80000000u);
     EXPECT_EQ(toInt32(0x7fff), 0x80000000u); // outside int32 range
     EXPECT_EQ(toInt32(0x8001), 0x80000000u); // outside int32 range
-    EXPECT_EQ(fromInt32(0x80000000u), 0x8000u);
+    EXPECT_EQ(fromInt32(0x80000000u), 0x8050u); // valid INT32_MIN
     EXPECT_EQ(fromInt32(1), 0x4000u);
     EXPECT_EQ(fromFloat32Bits(0x00000000), 0x0000u);
     EXPECT_EQ(fromFloat32Bits(0x80000000), 0x0000u);

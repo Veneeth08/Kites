@@ -30,5 +30,16 @@ inline constexpr std::array<const char *, 32> kFprAliases = {
     "fa2", "fa3", "fa4", "fa5", "fa6", "fa7", "fs2", "fs3", "fs4", "fs5", "fs6", "fs7",
     "fs8", "fs9", "fs10", "fs11", "ft8", "ft9", "ft10", "ft11"};
 
+// p0-p31 ABI aliases, index-matched with kPprNames.
+inline constexpr std::array<const char *, 32> kPprNames = {
+    "p0",  "p1",  "p2",  "p3",  "p4",  "p5",  "p6",  "p7",  "p8",  "p9",  "p10",
+    "p11", "p12", "p13", "p14", "p15", "p16", "p17", "p18", "p19", "p20", "p21",
+    "p22", "p23", "p24", "p25", "p26", "p27", "p28", "p29", "p30", "p31"};
+
+inline constexpr std::array<const char *, 32> kPprAliases = {
+    "pt0", "pt1", "pt2", "pt3", "pt4", "pt5", "pt6", "pt7", "ps0", "ps1", "pa0",
+    "pa1", "pa2", "pa3", "pa4", "pa5", "pa6", "pa7", "ps2", "ps3", "ps4", "ps5",
+    "ps6", "ps7", "ps8", "ps9", "ps10", "ps11", "pt8", "pt9", "pt10", "pt11"};
+
 } // namespace register_names
 } // namespace Kites

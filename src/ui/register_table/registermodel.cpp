@@ -151,7 +151,7 @@ QVariant RegisterModel::data(const QModelIndex &index, int role) const
             else if (row < 64)
                 return QString(register_names::kFprAliases[row - 32]);
             else if (row < 96)
-                return QString("p%1").arg(row - 64);
+                return QString(register_names::kPprAliases[row - 64]);
             else
                 return QString("");
         }

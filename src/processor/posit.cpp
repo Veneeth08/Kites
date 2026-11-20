@@ -104,6 +104,88 @@ Big multiply(const Big &lhs, const Big &rhs)
     return result;
 }
 
+Big negateBits(const Big &value)
+{
+    Big result;
+    uint64_t carry = 1;
+    for (size_t i = 0; i < result.limb.size(); ++i)
+    {
+        const uint64_t word = static_cast<uint64_t>(~value.limb[i]) + carry;
+        result.limb[i] = static_cast<uint32_t>(word);
+        carry = word >> 32;
+    }
+    return result;
+}
+
+bool signBit(const Big &value)
+{
+    return (value.limb.back() & 0x80000000u) != 0;
+}
+
+bool addMagnitude(const Big &lhs, const Big &rhs, Big &result)
+{
+    uint64_t carry = 0;
+    for (size_t i = 0; i < result.limb.size(); ++i)
+    {
+        const uint64_t sum = static_cast<uint64_t>(lhs.limb[i]) + rhs.limb[i] + carry;
+        result.limb[i] = static_cast<uint32_t>(sum);
+        carry = sum >> 32;
+    }
+    return carry != 0;
+}
+
+Big productUnits(uint16_t a, uint16_t b, bool &negative)
+{
+    const Decoded left = decode(a);
+    const Decoded right = decode(b);
+    negative = left.negative != right.negative;
+    const uint32_t product = static_cast<uint32_t>(left.significand) * right.significand;
+    const int shift = left.scale + right.scale + 112;
+    // Posit16 scales are [-56, 56], so shift is [0, 224].
+    return shiftLeft(fromU64(product), static_cast<unsigned>(shift));
+}
+
+Quire256 signedAddProduct(const Quire256 &q, uint16_t a, uint16_t b, bool subtract)
+{
+    if (isQuireNaR(q) || a == NAR || b == NAR) return quireNaR();
+
+    const bool qNegative = signBit(Big{q.limbs});
+    const Big qBits{q.limbs};
+    const Big qMagnitude = qNegative ? negateBits(qBits) : qBits;
+
+    bool productNegative = false;
+    const Big pMagnitude = productUnits(a, b, productNegative);
+    if (subtract && !isZero(pMagnitude)) productNegative = !productNegative;
+
+    Big resultMagnitude;
+    bool resultNegative = false;
+    bool overflow = false;
+    if (qNegative == productNegative)
+    {
+        overflow = addMagnitude(qMagnitude, pMagnitude, resultMagnitude);
+        resultNegative = qNegative;
+    }
+    else if (compare(qMagnitude, pMagnitude) >= 0)
+    {
+        resultMagnitude = subtractBig(qMagnitude, pMagnitude);
+        resultNegative = qNegative;
+    }
+    else
+    {
+        resultMagnitude = subtractBig(pMagnitude, qMagnitude);
+        resultNegative = productNegative;
+    }
+
+    // The magnitude 2^255 is the reserved NaR encoding. Greater magnitudes
+    // are signed overflow; neither may wrap into a finite Quire value.
+    if (overflow || signBit(resultMagnitude))
+        return quireNaR();
+    Big resultBits = resultNegative && !isZero(resultMagnitude)
+                         ? negateBits(resultMagnitude)
+                         : resultMagnitude;
+    return {resultBits.limb};
+}
+
 struct Fraction
 {
     bool negative = false;
@@ -260,6 +342,54 @@ uint16_t roundFraction(Fraction value)
 }
 } // namespace
 
+Quire256 quireZero()
+{
+    return {};
+}
+
+Quire256 quireNaR()
+{
+    Quire256 result;
+    result.limbs.back() = 0x80000000u;
+    return result;
+}
+
+bool isQuireNaR(const Quire256 &value)
+{
+    if (value.limbs.back() != 0x80000000u) return false;
+    for (size_t i = 0; i + 1 < value.limbs.size(); ++i)
+        if (value.limbs[i] != 0) return false;
+    return true;
+}
+
+Quire256 quireMulAdd(const Quire256 &q, uint16_t a, uint16_t b)
+{
+    return signedAddProduct(q, a, b, false);
+}
+
+Quire256 quireMulSub(const Quire256 &q, uint16_t a, uint16_t b)
+{
+    return signedAddProduct(q, a, b, true);
+}
+
+uint16_t quireToPosit(const Quire256 &value)
+{
+    if (isQuireNaR(value)) return NAR;
+
+    const Big bits{value.limbs};
+    const bool negative = signBit(bits);
+    const Big magnitude = negative ? negateBits(bits) : bits;
+    // Keep every subsequent Fraction cross-product within the existing
+    // 256-bit Big capacity. |Q| >= 2^168 units is already at least maxpos.
+    if (compare(magnitude, shiftLeft(fromU64(1), 168)) >= 0)
+        return negative ? static_cast<uint16_t>(~MAX_POS + 1) : MAX_POS;
+    Fraction exact;
+    exact.negative = negative;
+    exact.numerator = magnitude;
+    exact.denominator = shiftLeft(fromU64(1), 112);
+    return roundFraction(exact);
+}
+
 Decoded decode(uint16_t bits)
 {
     if (bits == 0) return {};
@@ -358,7 +488,6 @@ uint32_t toInt32(uint16_t bits)
 
 uint16_t fromInt32(uint32_t bits)
 {
-    if (bits == 0x80000000u) return NAR;
     const bool negative = (bits >> 31) != 0;
     const uint64_t magnitude = negative ? static_cast<uint64_t>(~bits + 1u) : bits;
     return encode(negative, magnitude, 0);

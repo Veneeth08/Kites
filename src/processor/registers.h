@@ -7,6 +7,9 @@
 #ifndef REGISTERS_H
 #define REGISTERS_H
 
+#include "processor/posit.h"
+
+#include <QMetaType>
 #include <QObject>
 #include <array>
 #include <string>
@@ -30,6 +33,7 @@ class RegisterFile : public QObject
     std::array<uint64_t, NUM_GPR> gpr_ = {}; ///< Array for storing GPR values.
     std::array<uint64_t, NUM_FPR> fpr_ = {}; ///< Array for storing FPR values.
     std::array<uint16_t, NUM_PREG> preg_ = {}; ///< Posit16 register bank.
+    posit::Quire256 quire_{}; ///< Single architectural Posit16 Quire.
 
     static constexpr size_t NUM_CSR = 4096; ///< Number of Control and Status Registers (CSR).
 
@@ -86,6 +90,9 @@ class RegisterFile : public QObject
     void WritePreg(size_t reg, uint16_t value);
     [[nodiscard]] std::vector<uint16_t> GetPregValues() const;
 
+    [[nodiscard]] const posit::Quire256 &ReadQuire() const;
+    void WriteQuire(const posit::Quire256 &value);
+
     [[nodiscard]] uint64_t ReadCsr(size_t reg) const;
 
     void WriteCsr(size_t reg, uint64_t value);
@@ -108,6 +115,7 @@ class RegisterFile : public QObject
     void updateRegister(size_t regIndex, uint64_t value);
     void updateFRegister(size_t regIndex, uint64_t value);
     void updatePRegister(size_t regIndex, uint16_t value);
+    void updateQuireValue(posit::Quire256 value);
     void registerResetSignal();
 };
 
@@ -132,4 +140,6 @@ bool IsValidPositRegister(const std::string &reg);
 
 bool IsValidCsr(const std::string &reg);
 }//namespace Kites
+
+Q_DECLARE_METATYPE(Kites::posit::Quire256)
 #endif // REGISTERS_H

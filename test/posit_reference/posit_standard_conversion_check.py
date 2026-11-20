@@ -112,8 +112,6 @@ for mismatch in integer_mismatches[:10] + float_mismatches[:10]:
     print(mismatch)
 
 def round_integer_standard(value):
-    if value == -(1 << 31):
-        return 0x8000
     if value == 0:
         return 0
     negative = value < 0

@@ -2,6 +2,7 @@
 #include "ui_registercontainer.h"
 #include "processor/registers.h"
 #include "ui/common/collapsible_section.h"
+#include "quiredisplay.h"
 #include <QHeaderView>
 #include <QSortFilterProxyModel>
 #include <QTableView>
@@ -38,10 +39,10 @@ class RegisterRangeProxyModel : public QSortFilterProxyModel
 
 RegisterContainer::RegisterContainer(QWidget *parent, RegisterFile *regfile)
     : QWidget(parent), ui(new Ui::RegisterContainer),
-      m_registerModel(new RegisterModel(this, regfile))
+      m_registerModel(new RegisterModel(this, regfile)), m_quireDisplay(nullptr)
 {
     ui->setupUi(this);
-    setupRegisterTable();
+    setupRegisterTable(regfile);
 
     ui->displayType->setCurrentText("Hexadecimal");
     connect(ui->displayType, &QComboBox::currentTextChanged, this,
@@ -69,7 +70,7 @@ QSortFilterProxyModel *RegisterContainer::makeRangeProxy(int firstRow, int lastR
     return proxy;
 }
 
-void RegisterContainer::setupRegisterTable()
+void RegisterContainer::setupRegisterTable(RegisterFile *regfile)
 {
     auto *sectionsLayout = new QVBoxLayout(ui->sectionsContainer);
     sectionsLayout->setContentsMargins(0, 0, 0, 0);
@@ -104,11 +105,17 @@ void RegisterContainer::setupRegisterTable()
         section->setContentWidget(tableView);
         sectionsLayout->addWidget(section);
     }
+
+    auto *quireSection = new CollapsibleSection("Quire", ui->sectionsContainer);
+    m_quireDisplay = new QuireDisplay(quireSection, regfile);
+    quireSection->setContentWidget(m_quireDisplay);
+    sectionsLayout->addWidget(quireSection);
 }
 
 void RegisterContainer::setRegisterFile(RegisterFile *regfile)
 {
     m_registerModel->changeRegisterFile(regfile);
+    m_quireDisplay->setRegisterFile(regfile);
 }
 
 RegisterContainer::~RegisterContainer()

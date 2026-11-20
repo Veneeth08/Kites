@@ -370,6 +370,21 @@ uint32_t generatePositMachineCode(const ICUnit &block)
     else if (op == "pcvt.p.s") { funct3 = 1; funct7 = 1; }
     else if (op == "pcvt.w.p") { funct3 = 2; funct7 = 1; }
     else if (op == "pcvt.p.w") { funct3 = 3; funct7 = 1; }
+    else if (op == "qclr") return 0x0000600bu;
+    else if (op == "qma")
+    {
+        return (1u << 25) | (extractRegisterIndex(block.getRs2()) << 20) |
+               (extractRegisterIndex(block.getRs1()) << 15) | (6u << 12) | 0x0bu;
+    }
+    else if (op == "qms")
+    {
+        return (2u << 25) | (extractRegisterIndex(block.getRs2()) << 20) |
+               (extractRegisterIndex(block.getRs1()) << 15) | (6u << 12) | 0x0bu;
+    }
+    else if (op == "qround")
+    {
+        return (3u << 25) | (6u << 12) | (extractRegisterIndex(block.getRd()) << 7) | 0x0bu;
+    }
     else if (op == "plh")
     {
         const uint32_t imm = static_cast<uint32_t>(std::stoll(block.getImm())) & 0xfff;

@@ -1,6 +1,6 @@
 # Posit16 (ES=2) RVSS integration demonstration.
 # Expected: p8 = 6, p9 = 6, p10 = 6, p11 = 6, x12 = 6.
-# Memory at byte address 256 contains the 16-bit Posit encoding of 6 (0x5800).
+# Memory at byte address 256 contains the 16-bit Posit encoding of 6 (0x5400).
 
     addi x1, x0, 6
     addi x2, x0, 2

@@ -9,6 +9,7 @@
 #include "alu.h"
 #include "common/assembled_program.h"
 #include "memory_controller.h"
+#include "processor/posit.h"
 #include "processor/processor_state.h"
 #include "processor/registers.h"
 #include "ui/processor_tab/circuit_scene.h"
@@ -26,6 +27,7 @@
 #include <filesystem>
 #include <memory>
 #include <mutex>
+#include <optional>
 #include <queue>
 #include <stack>
 #include <string>
@@ -60,6 +62,12 @@ struct MemoryChange
     std::vector<uint8_t> new_bytes_vec;
 };
 
+struct QuireChange
+{
+    posit::Quire256 old_value{};
+    posit::Quire256 new_value{};
+};
+
 struct StepDelta
 {
     uint64_t old_pc{};
@@ -74,6 +82,7 @@ struct StepDelta
     unsigned int new_branch_mispredictions{};
     std::vector<RegisterChange> register_changes{};
     std::vector<MemoryChange> memory_changes{};
+    std::optional<QuireChange> quire_change{};
 };
 
 /**

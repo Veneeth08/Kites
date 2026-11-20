@@ -14,6 +14,7 @@ namespace Ui
 class RegisterContainer;
 }
 class CollapsibleSection;
+class QuireDisplay;
 
 class RegisterContainer : public QWidget
 {
@@ -26,11 +27,12 @@ class RegisterContainer : public QWidget
     // private slots:
     //     void updateRegisterValue(size_t regIndex, uint64_t value);
   private:
-    void setupRegisterTable();
+    void setupRegisterTable(RegisterFile *regfile);
     QSortFilterProxyModel *makeRangeProxy(int firstRow, int lastRowExclusive);
 
     Ui::RegisterContainer *ui;
     RegisterModel *m_registerModel;
+    QuireDisplay *m_quireDisplay;
 };
 } // namespace Kites
 #endif // REGISTERCONTAINER_H

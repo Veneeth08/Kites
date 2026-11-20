@@ -376,7 +376,8 @@ static const std::unordered_set<std::string> valid_instructions = {
     "fdiv.d", "fsqrt.d", "fsgnj.d", "fsgnjn.d", "fsgnjx.d", "fmin.d", "fmax.d", "fcvt.s.d",
     "fcvt.d.s", "feq.d", "flt.d", "fle.d", "fclass.d", "fcvt.w.d", "fcvt.wu.d", "fcvt.d.w",
     "fcvt.d.wu", "fcvt.l.d", "fcvt.lu.d", "fmv.x.d", "fcvt.d.l", "fcvt.d.lu", "fmv.d.x",
-    "padd", "psub", "pmul", "pdiv", "pcvt.s.p", "pcvt.p.s", "pcvt.w.p", "pcvt.p.w", "plh", "psh"
+    "padd", "psub", "pmul", "pdiv", "pcvt.s.p", "pcvt.p.s", "pcvt.w.p", "pcvt.p.w", "plh", "psh",
+    "qclr", "qma", "qms", "qround"
 
 };
 
@@ -770,6 +771,8 @@ std::unordered_map<std::string, std::vector<SyntaxType>> instruction_syntax_map 
     {"pcvt.s.p", {SyntaxType::O_POSIT}}, {"pcvt.p.s", {SyntaxType::O_POSIT}},
     {"pcvt.w.p", {SyntaxType::O_POSIT}}, {"pcvt.p.w", {SyntaxType::O_POSIT}},
     {"plh", {SyntaxType::O_POSIT}}, {"psh", {SyntaxType::O_POSIT}},
+    {"qclr", {SyntaxType::O_POSIT}}, {"qma", {SyntaxType::O_POSIT}},
+    {"qms", {SyntaxType::O_POSIT}}, {"qround", {SyntaxType::O_POSIT}},
     {"add", {SyntaxType::O_GPR_C_GPR_C_GPR}},
     {"sub", {SyntaxType::O_GPR_C_GPR_C_GPR}},
     {"xor", {SyntaxType::O_GPR_C_GPR_C_GPR}},
@@ -996,7 +999,7 @@ bool isPositInstruction(const std::string &instruction)
 {
     static const std::unordered_set<std::string> names = {
         "padd", "psub", "pmul", "pdiv", "pcvt.s.p", "pcvt.p.s", "pcvt.w.p",
-        "pcvt.p.w", "plh", "psh"};
+        "pcvt.p.w", "plh", "psh", "qclr", "qma", "qms", "qround"};
     return names.find(instruction) != names.end();
 }
 
@@ -1432,6 +1435,18 @@ std::string disassemble(uint32_t instruction)
 
     case 0x0b:
     {
+        if (funct3 == 6)
+        {
+            if (funct7 == 0 && rd == 0 && rs1 == 0 && rs2 == 0)
+                return "qclr";
+            if (funct7 == 1 && rd == 0)
+                return "qma " + pr(rs1) + ", " + pr(rs2);
+            if (funct7 == 2 && rd == 0)
+                return "qms " + pr(rs1) + ", " + pr(rs2);
+            if (funct7 == 3 && rs1 == 0 && rs2 == 0)
+                return "qround " + pr(rd);
+            break;
+        }
         if (funct3 <= 3 && funct7 == 0)
         {
             static const char *ops[] = {"padd", "psub", "pmul", "pdiv"};

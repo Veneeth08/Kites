@@ -107,6 +107,22 @@ bool Parser::parsePositInstruction()
             return false;
         block.setRd(canonical(1)); block.setRs1(canonical(3));
     }
+    else if (op == "qclr")
+    {
+        if (!endAt(1)) return false;
+    }
+    else if (op == "qma" || op == "qms")
+    {
+        if (!tokenIs(1, TokenType::P_REGISTER) || !tokenIs(2, TokenType::COMMA) ||
+            !tokenIs(3, TokenType::P_REGISTER) || !endAt(4)) return false;
+        block.setRs1(canonical(1));
+        block.setRs2(canonical(3));
+    }
+    else if (op == "qround")
+    {
+        if (!tokenIs(1, TokenType::P_REGISTER) || !endAt(2)) return false;
+        block.setRd(canonical(1));
+    }
     else
     {
         if (!tokenIs(1, TokenType::P_REGISTER) || !tokenIs(2, TokenType::COMMA) ||
